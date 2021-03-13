@@ -3,6 +3,7 @@ from typing import List, Optional, Union, Dict
 import os
 import sys
 
+import yaml
 import numpy as np
 import pandas as pd
 import torch
@@ -114,5 +115,25 @@ def parse_test(path: str, public=False):
         'name_with_ext', 'file_path', 'file_name'])
     
     return data
+
+def seed_fix(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
+
+
+def init_layer(layer):
+    nn.init.xavier_uniform_(layer.weight)
+    if hasattr(layer, "bias"):
+        if layer.bias is not None:
+            layer.bias.data.fill_(0.)
+            
+def init_bn(bn):
+    bn.bias.data.fill_(0.)
+    bn.weight.data.fill_(1.0)
     
-    
+
