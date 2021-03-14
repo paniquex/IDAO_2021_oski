@@ -37,7 +37,7 @@ class MultiHeadSelfAttention(nn.Module):
             mask = mask[:, None, None, :].float()
             scores -= 10000.0 * (1.0 - mask)
         scores = self.dropout(F.softmax(scores, dim=-1))
-        scores = torch.matmil(v, scores).transpose(1, 2).contigous()
+        scores = torch.matmul(v, scores).transpose(1, 2).contigous()
         scores = merge_last(scores, 2)
         self.scores = scores
         

@@ -34,6 +34,13 @@ reg_pipeline_params:
         act_params: {}
         n_hid_blocks: 2
         
+    cb_params:
+        model_params:
+            
+        pool_params:
+            cache_params: '.'
+            
+        
     
 reg_agg_params:
     
