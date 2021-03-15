@@ -72,14 +72,19 @@ class NNRegPipeline(Pipeline):
     def __init__(self, config: dict):
         super().__init__(config)
         self.n_folds = config['general_params']['n_folds']
-        self.target_col = config['reg_pipeline_params']['target_col']
-        self.batch_size = config['reg_pipeline_params']['batch_size']
-        self.device = config['general_params']['device']
-        self.opt_name = config['reg_pipeline_params']['optimizer']
-        self.opt_params = config['reg_pipeline_params']['optimizer_params']
-        self.schd_name = config['reg_pipeline_params']['scheduler']
-        self.schd_params = config['reg_pipeline_params']['scheduler_params']
-        self.n_epochs = config['reg_pipeline_params']['n_epochs']
+        self.reg_params = config['reg_pipeline_params']
+        self.target_col = self.reg_params['target_col']
+        self.nn_model = self.reg_params['nn_model']
+        self.model_params = self.nn_model['model_params']
+        self.device = self.nn_model['device']
+        self.batch_size = self.nn_model['batch_size']
+        self.opt_name = self.nn_model['optimizer']
+        self.opt_params = self.nn_model['optimizer_params']
+        self.schd_name = self.nn_model['scheduler']
+        self.schd_params = self.nn_model['scheduler_params']
+        self.n_epochs = self.nn_model['n_epochs']
+        self.agg_params = self.reg_params['aggregation_params']
+        self.agg_type = self.agg_params['type']
         
     def fit(self, embeds_train, embed_folds):
         for i in range(self.n_folds):
@@ -89,7 +94,7 @@ class NNRegPipeline(Pipeline):
             optimizer = _OPTIMIZERS[self.opt_name](
                 model.parameters(), **self.opt_params)
             
-            scheduler = _SCHEDULERS[schd_name]
+            scheduler = _SCHEDULERS[self.schd_name]
             if scheduler is not None:
                 scheduler = scheduler(optimizer, **self.schd_params)
             
@@ -108,47 +113,66 @@ class NNRegPipeline(Pipeline):
             for epoch in range(self.n_epochs):
                 model.train()
                 train_loss = 0.0
+                train_elems = 0
                 for batch_idx, bdata in enumerate(train_loader):
-                    data, target = bdata['x'], bdata['target']
-                    optimizer.zero_grad()
+                    data, target = bdata['x'][0], bdata['target']
                     data = data.to(self.device)
-                    target = data.to(self.device)
+                    target = target.to(self.device)
+                    
+                    optimizer.zero_grad()
                     output = model(data)
-                    loss = criterion(loss, target)
+                    loss = criterion(output, target)
                     loss.backward()
                     optimizer.step()
-                    train_loss += float(loss)
+                    
+                    cur_elem = len(bdata)
+                    train_elems += cur_elem
+                    train_loss += float(loss) * cur_elem
+                
+                train_loss /= train_elems
                     
                 scheduler.step()
-                
                 model.eval()
-                val_loss = 0.0
+                valid_loss = 0.0
+                valid_elems = 0
                 for batch_idx, bdata in enumerate(val_loader):
-                    data, target, vid = bdata['x'], bdata['target'], bdata['id']
+                    data, target = bdata['x'][0], bdata['target']
                     data = data.to(self.device)
                     target = target.to(self.device)
                     output = model(data)
-                    loss = criterion(loss, target)
-                    val_loss += float(loss)
+                    loss = criterion(output, target)
+                    cur_elem = len(bdata)
+                    valid_elems += cur_elem
+                    valid_loss += float(loss) * cur_elem
+                    
+                valid_loss /= valid_elems
+                
+                print(f'epoch: {epoch}, train_loss: {train_loss}, valid_loss: {valid_loss}')
 
         val_loss = 0.0
-        preds = {}
-        for i in range(n_folds):
+        valid_elems = 0
+        preds = []
+        for i in range(self.n_folds):
             to_valid = embed_folds[embed_folds.folds == i]
             val_loader = DataLoader(
                 ValidDataset(to_valid, embeds_train, self.target_col),
                 batch_size=1, shuffle=False)
             model = self._models[i]
+            model.to('cpu')
             model.eval()
             criterion = nn.L1Loss()
             
             for batch_idx, bdata in enumerate(val_loader):
-                data, target, vid = bdata['x'], bdata['target'], bdata['id']
-                target = target.to(self.device)
+                data, target, vid = bdata['x'][0], bdata['target'], bdata['id'][0]
                 output = model(data)
-                loss = criterion(loss, target)
-                test_loss += float(loss)
-                preds.update({str(vid): float(output)})
+                loss = criterion(output, target)
+                cur_elem = len(bdata)
+                valid_elems += cur_elem
+                valid_loss += float(loss) * cur_elem
+                preds.append({'id': str(vid), self.target_col: float(output)})
+                
+        valid_loss /= valid_elems
+        print(f'last epoch, train_loss: {train_loss}, valid_loss: {valid_loss}')
         
         return pd.DataFrame(data=preds)
 
@@ -156,27 +180,37 @@ class NNRegPipeline(Pipeline):
                                        
     def predict(self, embeds_test):
         preds = []
-        keys = [x for x in embeds_test.keys()]
-        values = [x for x in embeds_test.values()]
-        values = np.asarray(values)
-        for i in range(len(self._models)):
+        for i in range(self.n_folds):
+            test_loader = DataLoader(
+                TestDataset(embeds_test, i),
+                batch_size=1, shuffle=False)
             model = self._models[i]
             model.eval()
             model.to('cpu')
-            x = torch.from_numpy(values[..., i])              
-            pred = model(x)
-            preds.append(pred.numpy())
-                                       
-        test_df = self.aggregate(pd.DataFrame(data=preds))
-        test_df['id'] = keys
-                                       
-        return test_df
+            preds_fold = []
+            for bdata in test_loader:
+                data, tid = bdata['x'], bdata['id'][0]
+                output = model(data)
+                preds_fold.append({'id': tid, f'fold_{i}': float(output)})
+            preds_fold = pd.DataFrame(data=preds_fold)
+            preds.append(preds_fold)
+        
+        pred = preds[0]
+        for i in range(1, self.n_folds):
+            pred = pred.merge(preds[i], on='id')
+            
+        return self.aggregate(pred)
     
     def aggregate(self, data):
-        data = data.copy()
-        data['reg'] = data.mean(axis=1)
-        
-        return data
+        if self.agg_type == 'mean':
+            data = data.copy()
+            fold_names = [f'fold_{i}' for i in range(self.n_folds)]
+            data[self.target_col] = data[fold_names].mean(axis=1)
+        if self.agg_params['save_fold_cols']:
+            return data
+        return data[['id', self.target_col]]
+
+
     
     
 class CBRegPipeline(Pipeline):
@@ -197,7 +231,6 @@ class CBRegPipeline(Pipeline):
         for i in range(n_folds):
             to_train = embed_folds[embed_folds.folds != i]
             to_valid = embed_folds[embed_folds.folds == i]
-            target_col = 
             model = CatBoostRegressor(**self.model_params)
             trn_ids, val_ids = [], []
             trn_X, val_X = [], []
@@ -220,15 +253,21 @@ class CBRegPipeline(Pipeline):
 
             with open(train_path, 'w') as f:
                 writer = csv.writer(f, delimiter='\t', quotechar='"')
-                for row in zip(to_train[:
-                    writer.writerow(('0', ';'.join(map(str, row))))
+                for y, row in zip(trn_y, trn_X):
+                    writer.writerow((str(y), ';'.join(map(str, row))))
         
+            
+            with open(val_path, 'w') as f:
+                writer = csv.writer(f, delimiter='\t', quotechar='"')
+                for row in zip(val_y, val_X):
+                    writer.writerow((str(y), ';'.join(map(str, row))))
+            
             with open(cd_path, 'w') as f:
                 f.write(
                     '0\tLabel\n'\
                     '1\tNumVector'
                 )
-
+                                        
             train_pool = None
             val_pool = None
             model.fit(train_pool, eval_set=[val_pool])
@@ -270,4 +309,13 @@ class CBRegPipeline(Pipeline):
         data[self.target_col] = data.mean(axis=1)
         
         return data
+
     
+class NNClsPipeline(Pipeline):
+    def __init__(self, config):
+        super(NNClsPipeline, self).__init__(config)
+        
+
+class CBClsPipeline(Pipeline):
+    def __init__(self, config):
+        super(NNClsPipeline, self).__init__(config)

@@ -30,7 +30,7 @@ class TrainDataset(Dataset):
     
 class ValidDataset(Dataset):
     def __init__(self, data, embeds, target_col):
-        super(TrainDataset, self).__init__()
+        super(ValidDataset, self).__init__()
         self.embeds = embeds
         self.data = data
         self.target_col = target_col
@@ -50,11 +50,11 @@ class TestDataset(Dataset):
         self.embeds = embeds
         self.n_fold = n_fold
         self.keys = [x for x in embeds.keys()]
-        self.values = [v[n_fold] for v in embeds.values()]
         
     def __getitem__(self, i):
-        return {'x': self.values[i], 'id': self.keys[i]}
+        tid = self.keys[i]
+        return {'x': self.embeds[tid][self.n_fold], 'id': tid}
     
     def __len__(self):
-        return len(self.values)
+        return len(self.keys)
     

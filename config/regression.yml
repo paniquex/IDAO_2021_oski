@@ -1,18 +1,19 @@
 general_params:
     random_seed: 42
     # device used for modeling
-    device: 'cuda:0'
+    
     # embeds dict in format 'name.png': [np.array(embed)],
     # yes there is a list.
-    train_embeds_path: '../idao_embeds/train_embeds.npy'
+    train_embeds_path: 'idao_embeds/train_embeds.npy'
     # embeds dict in format 'name': [np.array(embed),
     # np.array(embed), ...] x5
-    test_embeds_path: '../idao_embeds/test_embeds.npy'
+    test_embeds_path: 'idao_embeds/test_embeds.npy'
     # table with values predictions and folds for train
     # ['image_name', 'folds', 'cls', 'reg']
     train_folds_path: 'data/track_1/idao_dataset/corrected_folds.csv'
     # should be 2 task types ['reg', 'cls']
-    task_name: 'reg'
+    task: 'reg'
+    model_type: 'nn'
     # so it's like OOF
     pred_train: True
     pred_train_path: 'data/train_predictions.csv'
@@ -23,24 +24,35 @@ general_params:
     
 reg_pipeline_params:
     target_col: 'reg'
-    batch_size: 1000
-    model_params:
-        embed_dim: 2048
-        hidden_dim: 4096
-        use_dropout: False
-        drop_rate: 0.2
-        use_bn: False
-        act_name: 'relu'
-        act_params: {}
-        n_hid_blocks: 2
+    nn_model:
+        device: 'cuda:1'
+        batch_size: 1000
+        n_epochs: 100
+        optimizer: 'Adam'
+        optimizer_params: 
+            lr: 0.0001
+            
+        scheduler: 'StepLR'
+        scheduler_params:
+            step_size: 30
+        
+        model_params:
+            embed_dim: 2048
+            hidden_dim: 4096
+            use_dropout: False
+            drop_rate: 0.2
+            use_bn: True
+            act_name: 'relu'
+            act_params: {}
+            n_hid_blocks: 2
         
     cb_params:
         model_params:
+            num_trees: 2000
             
         pool_params:
             cache_params: '.'
-            
-        
     
-reg_agg_params:
-    
+    aggregation_params:
+        type: 'mean'
+        save_fold_cols: False

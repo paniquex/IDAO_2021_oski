@@ -4,9 +4,12 @@ import os
 import sys
 
 import yaml
+import random
+
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 from PIL import Image
 
 
@@ -73,7 +76,7 @@ def parse_nr(path: str) -> pd.DataFrame:
     return data[list(map_renaming.values())]
 
 
-def parse_train_dataset(path: str, encode_class=True, class_name='class') -> pd.DataFrame:
+def parse_train(path: str, encode_class=True, class_name='class') -> pd.DataFrame:
     """Parse train dataset.
     
     Args:

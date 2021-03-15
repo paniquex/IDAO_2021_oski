@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from .utils import init_layer, init_bn
 
 
-def _get_act(self, act_name, act_params):
+def _get_act(act_name, act_params):
     if act_name == 'relu':
         return nn.ReLU(**act_params)
     elif act_name == 'gelu':
@@ -38,16 +38,16 @@ class CNet(nn.Module):
         layers = []
         layer_names = []
         layers.append(nn.Linear(self.embed_dim, self.hidden_dim))
-        layers.append(get_act(self.act))
+        layers.append(_get_act(self.act, self.act_params))
         for i in range(self.hid_blocks):
-            if use_bn:
+            if self.use_bn:
                 layers.append(nn.BatchNorm1d(self.hidden_dim))
             layers.append(nn.Linear(self.hidden_dim, self.hidden_dim))
-            layers.append(get_act(self.act))
-            if i == self.hid_blocks - 1 and use_dropout:
+            layers.append(_get_act(self.act, self.act_params))
+            if i == self.hid_blocks - 1 and self.use_dropout:
                 layers.append(nn.Dropout(self.drop_rate))
                 
-        layers.append(self.Linear(self.hidden_dim, 2))
+        layers.append(nn.Linear(self.hidden_dim, 2))
         layers.append(nn.Softmax(dim=1))
         self.layers = nn.ModuleList(layers)
         self.layers.apply(self._init_layers)
@@ -55,7 +55,7 @@ class CNet(nn.Module):
     def _init_layers(self, layer):
         if isinstance(m, nn.BatchNorm1d):
             init_bn(layer)
-        else:
+        elif isinstance(layer, nn.Linear):
             init_layer(layer)    
         
     def forward(self, x):
@@ -81,36 +81,27 @@ class RNet(nn.Module):
         layers = []
         layer_names = []
         layers.append(nn.Linear(self.embed_dim, self.hidden_dim))
-        layers.append(get_act(self.act))
+        layers.append(_get_act(self.act, self.act_params))
         for i in range(self.hid_blocks):
-            if use_bn:
+            if self.use_bn:
                 layers.append(nn.BatchNorm1d(self.hidden_dim))
             layers.append(nn.Linear(self.hidden_dim, self.hidden_dim))
-            layers.append(get_act(self.act))
-            if i == self.hid_blocks - 1 and use_dropout:
+            layers.append(_get_act(self.act, self.act_params))
+            if i == self.hid_blocks - 1 and self.use_dropout:
                 layers.append(nn.Dropout(self.drop_rate))
                 
-        layers.append(self.Linear(self.hidden_dim, 1))
+        layers.append(nn.Linear(self.hidden_dim, 1))
         self.layers = nn.ModuleList(layers)
         self.layers.apply(self._init_layers)
         
-        
-    def _get_act(self, act_name, act_params):
-        if act_name == 'relu':
-            return nn.ReLU(**act_params)
-        elif act_name == 'gelu':
-            return nn.GELU(**act_params)
-        elif act_name == 'leakyrelu':
-            return nn.LeakyReLU(**act_params)
-        
     def _init_layers(self, layer):
-        if isinstance(m, nn.BatchNorm1d):
+        if isinstance(layer, nn.BatchNorm1d):
             init_bn(layer)
-        else:
+        elif isinstance(layer, nn.Linear):
             init_layer(layer)    
         
     def forward(self, x):
         for layer in self.layers:
             x = layer(x)
-        return x
+        return x.view(-1)
     

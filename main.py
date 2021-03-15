@@ -7,7 +7,9 @@ Just a script with pipeline.
 4) aggregate predictions
 
 TODO: add logging
-TODO: add catboost
+
+zapusk:
+# python3 main.py --config config/regression.yml
 
 """
 import argparse
@@ -17,8 +19,9 @@ import logging
 import numpy as np
 import pandas as pd
 
-from .utils import parse_train, parse_test, seed_fix
-from .pipelines import RPipeline, CPipeline
+from src.utils import seed_fix
+from src.pipelines import NNRegPipeline, NNClsPipeline, \
+    CBRegPipeline, CBRegPipeline
 
 
 def main(config_path: str):
@@ -43,12 +46,19 @@ def main(config_path: str):
     embeds_test = np.load(gp['test_embeds_path'], allow_pickle=True)
     embeds_test = embeds_test.tolist()
     
+    
     embed_folds = pd.read_csv(gp['train_folds_path'])
     
     if task == 'reg':
-        pipeline = RPipeline(config)
+        if gp['model_type'] == 'nn':
+            pipeline = NNRegPipeline(config)
+        elif gp['model_type'] == 'cb':
+            pipeline = CBRegPipeline(config)
     else:
-        pipeline = CPipeline(config)
+        if gp['model_type'] == 'nn':
+            pipeline = NNClsPipeline(config)
+        elif gp['model_type'] == 'cb':
+            pipeline = CBClsPipeline(config)
         
     train_preds = pipeline.fit(embeds_train, embed_folds)
     test_preds = pipeline.predict(embeds_test)
