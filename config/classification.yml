@@ -12,7 +12,7 @@ general_params:
     # ['image_name', 'folds', 'cls', 'reg']
     train_folds_path: 'data/track_1/idao_dataset/corrected_folds.csv'
     # should be 2 task types ['reg', 'cls']
-    task: 'reg'
+    task: 'cls'
     model_type: 'nn'
     # so it's like OOF
     pred_train: True
@@ -23,7 +23,7 @@ general_params:
     
     
 pipeline_params:
-    target_col: 'reg'
+    target_col: 'cls'
     nn_model:
         device: 'cuda:1'
         batch_size: 1000
