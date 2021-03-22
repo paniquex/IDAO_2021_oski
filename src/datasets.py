@@ -1,0 +1,66 @@
+import sys
+sys.path.append("/media/paniquex/samsung_2tb/IDAO_2021_oski/src")
+
+from torch.utils.data import Dataset
+import torch
+import cv2
+import os
+
+
+class SimpleDataset(Dataset):
+    def __init__(self, df, mode, target_cols="target", transform=None, classes_num=12, task_type="classification"):
+
+        self.df = df.reset_index(drop=True)
+        self.mode = mode
+        self.transform = transform
+        self.samples = self.df["file_path"].values
+        if mode != "test":
+            self.labels = df[target_cols].values
+            if task_type == "classification":
+                self.labels = self.labels[:, None] == list(range(classes_num))
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, index):
+        row = self.df.loc[index]
+        img = cv2.imread(row.file_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        if self.transform is not None:
+            res = self.transform(image=img)
+            img = res['image']
+        if self.mode == 'test':
+            return {"sample": self.samples[index], "img": img}
+        else:
+            label = torch.tensor(self.labels[index]).float()
+            return {"sample": self.samples[index], "img": img, "label": label}
+
+
+class EmbGenerationDataset(Dataset):
+    def __init__(self, df, fold, paths_list, transform=None):
+        self.df = df.reset_index(drop=True)
+        print(len(df.file_path.values))
+        self.file_names = []
+        for path in paths_list:
+            fnames = os.listdir(path)
+            fnames = [os.path.join(path, fname) for fname in fnames]
+            if ("NR" in path) or ("ER" in path):
+                fnames = [fname for fname in fnames if (fname in self.df[df["kfold"] == fold].file_path.values) or (fname not in self.df.file_path.values)]
+                print("CHECK1", len(fnames))
+            self.file_names.extend(fnames)
+        print(len(self.file_names))
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.file_names)
+
+    def __getitem__(self, index):
+
+        img = cv2.imread(self.file_names[index])
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        if self.transform is not None:
+            res = self.transform(image=img)
+            img = res['image']
+        return {"sample": self.file_names[index], "img": img}
