@@ -1,13 +1,13 @@
 general:
   seed: 1
-  task_type: "regression" # classification, regression
+  task_type: "joint" # classification, regression, joint
   classes_num: 6 # 24 + silence
   model_name: "resnest14d"
   use_additional_loss_for_aam: True
-  device_ids: [1]
-  out_path: "./IDAO_2021_oski/experiments/resnest14d_1e-4_regression/"
+  device_ids: [0]
+  out_path: "./IDAO_2021_oski/experiments/resnest14d_1e-4_joint/"
   data_root: "/media/paniquex/samsung_2tb/IDAO_2021_oski/data/track_1/idao_dataset"
-  early_stopping_by: "mae" # f1, roc_auc, mae
+  early_stopping_by: "comp_metric" # f1, roc_auc, mae, comp_metric
 
 
 preprocessing:
@@ -17,9 +17,9 @@ preprocessing:
 training:
   loss: "L1" # "L1" - regression, "AAM" "BCE", "FOCAL" - classification
   activation_func: ReLU # ReLU, Mish
-  n_epochs: 10
-  n_epochs_flat: 2
-  early_stopping_criterion: 5
+  n_epochs: 25
+  n_epochs_flat: 10
+  early_stopping_criterion: 10
   n_folds: 5
   logging_freq: 1
   lr: !!float 1e-4
@@ -32,7 +32,7 @@ training:
 
   # dataloader config
   dataloader:
-    batch_size: 16
+    batch_size: 32
     shuffle: True
     num_workers: 8
     pin_memory: False
@@ -45,7 +45,7 @@ validation:
 
   # dataloader config
   dataloader:
-    batch_size: 12
+    batch_size: 24
     shuffle: False
     num_workers: 4
     pin_memory: False
