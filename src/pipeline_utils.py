@@ -1,6 +1,8 @@
 import sys
 
-sys.path.append("/media/paniquex/samsung_2tb/IDAO_2021_oski/src")
+from paths import PATH_APPEND
+sys.path.append(PATH_APPEND)
+
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -15,9 +17,9 @@ from shutil import copyfile
 def training(EPOCHS, model, train_dataloader,
              val_dataloaders_dct, DEVICE, criterion,
              optimizer, config, scheduler=None,
-             fold=0, task_type="classification"):
+             fold=0, task_type="classification", CONFIG_PATH=""):
     if fold == 0:
-        copyfile("/media/paniquex/samsung_2tb/IDAO_2021_oski/config/config.yaml",
+        copyfile(CONFIG_PATH,
                  f"{config['general']['out_path']}config.yaml")
     tta_steps = 0
     best_scores = {}
@@ -441,3 +443,4 @@ def convert_relu_to_Mish(model):
             setattr(model, child_name, Mish())
         else:
             convert_relu_to_Mish(child)
+
