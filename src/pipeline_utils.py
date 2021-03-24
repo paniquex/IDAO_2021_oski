@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append("/media/paniquex/samsung_2tb/IDAO_2021_oski/src")
 import numpy as np
 import pandas as pd
@@ -12,23 +13,43 @@ from shutil import copyfile
 
 
 def training(EPOCHS, model, train_dataloader,
-             val_dataloader, DEVICE, criterion,
+             val_dataloaders_dct, DEVICE, criterion,
              optimizer, config, scheduler=None,
              fold=0, task_type="classification"):
     if fold == 0:
-        copyfile("/media/paniquex/samsung_2tb/IDAO_2021_oski/config/config.yaml", f"{config['general']['out_path']}config.yaml")
+        copyfile("/media/paniquex/samsung_2tb/IDAO_2021_oski/config/config.yaml",
+                 f"{config['general']['out_path']}config.yaml")
     tta_steps = 0
-    if task_type == "classification":
-        best_scores = {'val': 0}
-    elif task_type == "regression":
-        best_scores = {'val': -10000}
-    model_names = []
+    best_scores = {}
+    model_names = {}
+    best_max = {}
+    best_mean = {}
+    for val_dataloader_name in val_dataloaders_dct:
+        if task_type == "classification":
+            best_scores[val_dataloader_name] = 0
+            best_max[val_dataloader_name] = 0
+            best_mean[val_dataloader_name] = 0
+        elif task_type == "regression":
+            best_scores[val_dataloader_name] = -10000
+            best_max[val_dataloader_name] = -10000
+            best_mean[val_dataloader_name] = -10000
+        elif task_type == "joint":
+            best_scores[val_dataloader_name] = -10000
+            best_max[val_dataloader_name] = -10000
+            best_mean[val_dataloader_name] = -10000
+        model_names[val_dataloader_name] = []
 
     train_df = defaultdict(list)
-    val_df = defaultdict(list)
+    val_df = {}
+    for val_dataloader_name in val_dataloaders_dct:
+        val_df[val_dataloader_name] = defaultdict(list)
 
-    samples2trues_all = {}
-    samples2preds_all = {}
+    if task_type == "joint":
+        samples2trues_all = {"clf": {}, "reg": {}}
+        samples2preds_all = {"clf": {}, "reg": {}}
+    else:
+        samples2trues_all = {}
+        samples2preds_all = {}
 
     early_stopping_counter = 0
     early_stopping_criterion = config["training"]["early_stopping_criterion"]
@@ -37,25 +58,41 @@ def training(EPOCHS, model, train_dataloader,
         t = tqdm(train_dataloader)
         model.train()
         for batch in t:
-            img_, class_ = batch["img"].to(DEVICE), batch["label"].to(DEVICE)
-            output_dict = model(img_) # class_) # predictions, mixuped classes
+            if task_type == "joint":
+                img_, class_ = batch["img"].to(DEVICE), {"clf": batch["label"]["clf"].to(DEVICE),
+                                                         "reg": batch["label"]["reg"].to(DEVICE)}
+            else:
+                img_, class_ = batch["img"].to(DEVICE), batch["label"].to(DEVICE)
+            output_dict = model(img_)  # class_) # predictions, mixuped classes
             if criterion == "AAM":
-                pred = output_dict["preds"]
+                preds = output_dict["preds"]
                 if config["general"]["use_additional_loss_for_aam"]:
                     loss = 0.5 * output_dict["loss"] + torch.nn.BCELoss()(pred.float(), class_.float())
                 else:
                     loss = output_dict["loss"]
             else:
-                pred = output_dict["preds"]
-                loss = criterion(pred.float(), class_.float())
+                preds = output_dict["preds"]
+                trues = {"clf": [], "reg": []}
+                if task_type == "joint":
+                    preds_clf = preds["clf"]
+                    preds_reg = preds["reg"]
+                    loss = criterion["clf"](preds_clf.float(), class_["clf"]) + criterion["reg"](preds_reg.float(),
+                                                                                                 class_["reg"])
+                else:
+                    loss = criterion(preds.float(), class_.float())
             try:
                 losses.append(loss.item())
             except:
                 print("ERROR in loss list appending")
 
-            preds.append(pred.cpu().detach().numpy())
-            trues.append(class_.cpu().detach().numpy())
-
+            if task_type == "joint":
+                preds["clf"] = preds["clf"].detach().cpu().numpy()
+                preds["reg"] = preds["reg"].detach().cpu().numpy()
+                trues["clf"] = class_["clf"].detach().cpu().numpy()
+                trues["reg"] = class_["reg"].detach().cpu().numpy()
+            else:
+                preds = pred.cpu().numpy()
+                trues = class_.cpu().numpy()
             loss.backward()
             optimizer.step()
             model.zero_grad()
@@ -67,133 +104,16 @@ def training(EPOCHS, model, train_dataloader,
                         scheduler.step()
                     except:
                         scheduler.step(-np.max(best_max, best_mean))
-
-        trues = np.vstack(trues)
-        preds = np.vstack(preds)
+        if task_type == "joint":
+            for key in ["clf", "reg"]:
+                trues[key] = np.vstack(trues[key])
+                preds[key] = np.vstack(preds[key])
+        else:
+            trues = np.vstack(trues)
+            preds = np.vstack(preds)
 
         loss = np.hstack(losses).mean()
-        if task_type == "classification":
-            trues_argmax = np.argmax(trues, axis=1)
-            preds_argmax = np.argmax(preds, axis=1)
-            score_f1 = f1_score(trues_argmax, preds_argmax, average='micro')
-            prec = precision_score(trues_argmax, preds_argmax, average='micro')
-            rec = recall_score(trues_argmax, preds_argmax, average='micro')
-            # roc_auc = roc_auc_score(trues_argmax, preds, multi_class="ovr",)# labels=np.arange(config["general"]["classes_num"]))
-            roc_auc = 0
-        elif task_type == "regression":
-            mae = mean_absolute_error(trues, preds)
-        if task_type == "classification":
-            info_dict = {"epoch": epoch,
-                         "loss": loss,
-                         "f1_score": score_f1,
-                         "prec": prec,
-                         "rec": rec,
-                         "roc_auc": roc_auc}
-        elif task_type == "regression":
-            info_dict = {"epoch": epoch,
-                         "loss": loss,
-                         "mae": mae}
-        log_results(train_df, "train", info_dict=info_dict, trues=trues,
-                    preds_dict={"preds": preds},
-                    out_path=config["general"]["out_path"])
-        pd.DataFrame(train_df).to_csv(f"{config['general']['out_path']}{config['general']['model_name']}_train.csv",
-                                      index=None)
 
-        if epoch % config["training"]["logging_freq"] == 0:
-
-            scores_dict, trues, preds_dict, samples2preds, samples2trues = evaluate(model=model, dataloader=val_dataloader,
-                                                                                    criterion=criterion, DEVICE=DEVICE,
-                                                                                    tta_steps=tta_steps, config=config,
-                                                                                    task_type=task_type)
-            samples2preds_all.update(samples2preds)
-            samples2trues_all.update(samples2trues)
-
-            info_dict = {"epoch": epoch}
-            info_dict.update(scores_dict)
-            log_results(val_df, "val", info_dict=info_dict, out_path=config["general"]["out_path"],
-                        trues=trues, preds_dict=preds_dict)
-            early_stopping_counter += 1
-            print(f"EARLY STOPPING COUNTER: {early_stopping_counter}/{early_stopping_criterion}")
-            if config["general"]["early_stopping_by"] == "roc_auc":
-                best_max = scores_dict["roc_auc"]
-                best_mean = scores_dict["roc_auc"]
-            elif config["general"]["early_stopping_by"] == "f1":
-                best_max = scores_dict["f1_score"]
-                best_mean = scores_dict["f1_score"]
-            elif config["general"]["early_stopping_by"] == "mae":
-                best_max = -scores_dict["mae"]
-                best_mean = -scores_dict["mae"]
-            if max(best_max, best_mean) > best_scores['val']:
-                early_stopping_counter = 0
-                optim_params = optimizer.state_dict()
-                model_params = model.state_dict()
-                all_params = {'model_state_dict': model_params, 'optimizer_state_dict': optim_params}
-                best_scores['val'] = max(best_max, best_mean)
-                torch.save(all_params, f"{config['general']['out_path']}{config['general']['model_name']}_score={best_scores['val']:.5f}")
-                model_names.append(f"{config['general']['out_path']}{config['general']['model_name']}_score={best_scores['val']:.5f}")
-            pd.DataFrame(val_df).to_csv(f"{config['general']['out_path']}{config['general']['model_name']}_val_{fold}.csv", index=None)
-
-            if early_stopping_counter > early_stopping_criterion:
-                break
-    best_model_name = model_names[-1]
-    print(model_names)
-    print(best_model_name)
-    os.rename(best_model_name, f"{config['general']['out_path']}best_model_fold{fold}_score={best_scores['val']:.5f}.pth")
-    for model_name in model_names[:-1]:
-        if model_name != best_model_name:
-            os.remove(model_name)
-    return samples2preds_all, samples2trues_all
-
-
-def evaluate(model, dataloader, DEVICE,
-             criterion=None, config=None, tta_steps=0, task_type="classification"):
-    t = tqdm(dataloader)
-    samples2preds = {}
-    samples2trues = {}
-    with torch.no_grad():
-        model.eval()
-        losses = []
-        if tta_steps == 0:
-            print("Predict test without augmentations")
-        for batch in t:
-            output_dict = model(batch["img"].to(DEVICE))
-            class_ = batch["label"].to(DEVICE).float()
-            if output_dict["label"] is not None:
-                class_ = output_dict["label"]
-            if criterion is not None:
-                if criterion == "AAM":
-                    preds = output_dict["preds"]
-                    loss = output_dict["loss"]
-                else:
-                    preds = output_dict["preds"]
-                    loss = criterion(preds.float(), class_.float())
-                try:
-                    losses.append(loss.item())
-                except:
-                    print("ERROR in appending")
-            preds = preds.cpu().numpy()
-            trues = class_.cpu().numpy()
-            for sample, true, pred in zip(batch['sample'], trues, preds):
-                if sample not in samples2trues:
-                    samples2trues[sample] = [true]
-                else:
-                    samples2trues[sample].append(true)
-
-                if sample not in samples2preds:
-                    samples2preds[sample] = [pred]
-                else:
-                    samples2preds[sample].append(pred)
-
-        trues = []
-        preds = []
-        for sample in samples2preds:
-            pred = np.vstack(samples2preds[sample])
-            true = np.vstack(samples2trues[sample])
-            preds.append(pred)  # [:24] to exclude silence class
-            trues.append(true)
-
-        preds = np.vstack(preds)
-        trues = np.vstack(trues)
         if task_type == "classification":
             preds_argmax = np.argmax(preds, axis=1)
             trues_argmax = np.argmax(trues, axis=1)
@@ -203,6 +123,15 @@ def evaluate(model, dataloader, DEVICE,
             roc_auc = roc_auc_score(trues_argmax, preds, multi_class="ovr")
         elif task_type == "regression":
             mae = mean_absolute_error(trues, preds)
+        elif task_type == "joint":
+            preds_argmax = np.argmax(preds["clf"], axis=1)
+            trues_argmax = np.argmax(trues["clf"], axis=1)
+            score_f1 = f1_score(trues_argmax, preds_argmax, average='micro')
+            prec = precision_score(trues_argmax, preds_argmax, average='micro')
+            rec = recall_score(trues_argmax, preds_argmax, average='micro')
+            roc_auc = roc_auc_score(trues["clf"][:, 0], preds["clf"][:, 0])
+            mae = mean_absolute_error(trues["reg"], preds["reg"])
+            comp_metric = 1000 * (roc_auc - mae)
 
         if task_type == "classification":
             scores_dict = {"loss": loss,
@@ -212,6 +141,220 @@ def evaluate(model, dataloader, DEVICE,
                            "roc_auc": roc_auc}
         elif task_type == "regression":
             scores_dict = {"loss": loss, "mae": mae}
+        elif task_type == "joint":
+            scores_dict = {"loss": loss,
+                           "f1_score": score_f1,
+                           "prec": prec,
+                           "rec": rec,
+                           "roc_auc": roc_auc}
+            scores_dict.update({"mae": mae, "comp_metric": comp_metric})
+        info_dict = {"epoch": epoch}
+        info_dict.update(scores_dict)
+        log_results(train_df, "train", info_dict=info_dict, trues=trues,
+                    preds_dict={"preds": preds},
+                    out_path=config["general"]["out_path"])
+        pd.DataFrame(train_df).to_csv(f"{config['general']['out_path']}{config['general']['model_name']}_train.csv",
+                                      index=None)
+        flag_early_stopping = False
+        if epoch % config["training"]["logging_freq"] == 0:
+            for val_dataloader_name in val_dataloaders_dct:
+                scores_dict, trues, preds_dict, samples2preds, samples2trues = evaluate(model=model,
+                                                                                        dataloader=val_dataloaders_dct[
+                                                                                            val_dataloader_name],
+                                                                                        criterion=criterion,
+                                                                                        DEVICE=DEVICE,
+                                                                                        tta_steps=tta_steps,
+                                                                                        config=config,
+                                                                                        task_type=task_type)
+                if task_type == "joint":
+                    for key in ["clf", "reg"]:
+                        samples2preds_all[key].update(samples2preds[key])
+                        samples2trues_all[key].update(samples2trues[key])
+                else:
+                    samples2preds_all.update(samples2preds)
+                    samples2trues_all.update(samples2trues)
+
+                info_dict = {"epoch": epoch}
+                info_dict.update(scores_dict)
+                log_results(val_df[val_dataloader_name], "val", info_dict=info_dict,
+                            out_path=config["general"]["out_path"],
+                            trues=trues, preds_dict=preds_dict)
+                if not flag_early_stopping:
+                    early_stopping_counter += 1
+                    print(f"EARLY STOPPING COUNTER: {early_stopping_counter}/{early_stopping_criterion}")
+                    flag_early_stopping = True
+
+                if config["general"]["early_stopping_by"] == "roc_auc":
+                    best_max[val_dataloader_name] = scores_dict["roc_auc"]
+                    best_mean[val_dataloader_name] = scores_dict["roc_auc"]
+                elif config["general"]["early_stopping_by"] == "f1":
+                    best_max[val_dataloader_name] = scores_dict["f1_score"]
+                    best_mean[val_dataloader_name] = scores_dict["f1_score"]
+                elif config["general"]["early_stopping_by"] == "mae":
+                    best_max[val_dataloader_name] = -scores_dict["mae"]
+                    best_mean[val_dataloader_name] = -scores_dict["mae"]
+                elif config["general"]["early_stopping_by"] == "comp_metric":
+                    best_max[val_dataloader_name] = scores_dict["comp_metric"]
+                    best_mean[val_dataloader_name] = scores_dict["comp_metric"]
+                if max(best_max[val_dataloader_name], best_mean[val_dataloader_name]) > best_scores[
+                    val_dataloader_name]:
+                    early_stopping_counter = 0
+                    optim_params = optimizer.state_dict()
+                    model_params = model.state_dict()
+                    all_params = {'model_state_dict': model_params, 'optimizer_state_dict': optim_params}
+                    best_scores[val_dataloader_name] = max(best_max[val_dataloader_name],
+                                                           best_mean[val_dataloader_name])
+                    torch.save(all_params,
+                               f"{config['general']['out_path']}{config['general']['model_name']}_score={best_scores[val_dataloader_name]:.5f}")
+                    model_names[val_dataloader_name].append(
+                        f"{config['general']['out_path']}{config['general']['model_name']}_score={best_scores[val_dataloader_name]:.5f}")
+                pd.DataFrame(val_df[val_dataloader_name]).to_csv(
+                    f"{config['general']['out_path']}{config['general']['model_name']}_{val_dataloader_name}_{fold}.csv",
+                    index=None)
+
+        if early_stopping_counter > early_stopping_criterion:
+            break
+    for val_dataloader_name in val_dataloaders_dct:
+        best_model_name = model_names[val_dataloader_name][-1]
+        print(model_names[val_dataloader_name])
+        print(best_model_name)
+        os.rename(best_model_name,
+                  f"{config['general']['out_path']}best_model_fold{fold}_score={best_scores[val_dataloader_name]:.5f}.pth")
+        for model_name in model_names[val_dataloader_name][:-1]:
+            if model_name != best_model_name:
+                os.remove(model_name)
+    return samples2preds_all, samples2trues_all
+
+
+def evaluate(model, dataloader, DEVICE,
+             criterion=None, config=None, tta_steps=0, task_type="classification"):
+    t = tqdm(dataloader)
+    if task_type == "joint":
+        samples2preds = {"clf": {}, "reg": {}}
+        samples2trues = {"clf": {}, "reg": {}}
+    else:
+        samples2preds = {}
+        samples2trues = {}
+    with torch.no_grad():
+        model.eval()
+        losses = []
+        if tta_steps == 0:
+            print("Predict test without augmentations")
+        for batch in t:
+            output_dict = model(batch["img"].to(DEVICE))
+            if task_type == "joint":
+                class_ = {"clf": batch["label"]["clf"].to(DEVICE).float(),
+                          "reg": batch["label"]["reg"].to(DEVICE).float()}
+            else:
+                class_ = batch["label"].to(DEVICE).float()
+            if output_dict["label"] is not None:
+                class_ = output_dict["label"]
+            if criterion is not None:
+                if criterion == "AAM":
+                    preds = output_dict["preds"]
+                    loss = output_dict["loss"]
+                else:
+                    preds = output_dict["preds"]
+                    if task_type == "joint":
+                        preds_clf = preds["clf"]
+                        preds_reg = preds["reg"]
+                        loss = criterion["clf"](preds_clf.float(), class_["clf"]) + criterion["reg"](preds_reg.float(),
+                                                                                                     class_["reg"])
+                    else:
+                        loss = criterion(preds.float(), class_.float())
+                try:
+                    losses.append(loss.item())
+                except:
+                    print("ERROR in appending")
+            if task_type == "joint":
+                trues = {}
+                preds["clf"] = preds["clf"].cpu().numpy()
+                preds["reg"] = preds["reg"].cpu().numpy()
+                trues["clf"] = class_["clf"].cpu().numpy()
+                trues["reg"] = class_["reg"].cpu().numpy()
+            else:
+                preds = preds.cpu().numpy()
+                trues = class_.cpu().numpy()
+            if task_type == "joint":
+                for key in ["clf", "reg"]:
+                    for sample, true, pred in zip(batch['sample'], trues[key], preds[key]):
+                        if sample not in samples2trues:
+                            samples2trues[key][sample] = [true]
+                        else:
+                            samples2trues[key][sample].append(true)
+
+                        if sample not in samples2preds:
+                            samples2preds[key][sample] = [pred]
+                        else:
+                            samples2preds[key][sample].append(pred)
+
+            else:
+                for sample, true, pred in zip(batch['sample'], trues, preds):
+                    if sample not in samples2trues:
+                        samples2trues[sample] = [true]
+                    else:
+                        samples2trues[sample].append(true)
+
+                    if sample not in samples2preds:
+                        samples2preds[sample] = [pred]
+                    else:
+                        samples2preds[sample].append(pred)
+
+        if task_type == "joint":
+            trues = {"clf": [], "reg": []}
+            preds = {"clf": [], "reg": []}
+            for key in ["clf", "reg"]:
+                for sample in samples2preds[key]:
+                    pred = np.vstack(samples2preds[key][sample])
+                    true = np.vstack(samples2trues[key][sample])
+                    preds[key].append(pred)
+                    trues[key].append(true)
+                preds[key] = np.vstack(preds[key])
+                trues[key] = np.vstack(trues[key])
+        else:
+            trues = []
+            preds = []
+            for sample in samples2preds:
+                pred = np.vstack(samples2preds[sample])
+                true = np.vstack(samples2trues[sample])
+                preds.append(pred)
+                trues.append(true)
+            preds = np.vstack(preds)
+            trues = np.vstack(trues)
+        if task_type == "classification":
+            preds_argmax = np.argmax(preds, axis=1)
+            trues_argmax = np.argmax(trues, axis=1)
+            score_f1 = f1_score(trues_argmax, preds_argmax, average='micro')
+            prec = precision_score(trues_argmax, preds_argmax, average='micro')
+            rec = recall_score(trues_argmax, preds_argmax, average='micro')
+            roc_auc = roc_auc_score(trues_argmax, preds, multi_class="ovr")
+        elif task_type == "regression":
+            mae = mean_absolute_error(trues, preds)
+        elif task_type == "joint":
+            preds_argmax = np.argmax(preds["clf"], axis=1)
+            trues_argmax = np.argmax(trues["clf"], axis=1)
+            score_f1 = f1_score(trues_argmax, preds_argmax, average='micro')
+            prec = precision_score(trues_argmax, preds_argmax, average='micro')
+            rec = recall_score(trues_argmax, preds_argmax, average='micro')
+            roc_auc = roc_auc_score(trues["clf"][:, 0], preds["clf"][:, 0])
+            mae = mean_absolute_error(trues["reg"], preds["reg"])
+            comp_metric = 1000 * (roc_auc - mae)
+
+        if task_type == "classification":
+            scores_dict = {"loss": loss,
+                           "f1_score": score_f1,
+                           "prec": prec,
+                           "rec": rec,
+                           "roc_auc": roc_auc}
+        elif task_type == "regression":
+            scores_dict = {"loss": loss, "mae": mae}
+        elif task_type == "joint":
+            scores_dict = {"loss": loss,
+                           "f1_score": score_f1,
+                           "prec": prec,
+                           "rec": rec,
+                           "roc_auc": roc_auc}
+            scores_dict.update({"mae": mae, "comp_metric": comp_metric})
         preds_dict = {"preds": preds}
         return scores_dict, trues, preds_dict, samples2preds, samples2trues
 
@@ -254,6 +397,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 
+
 @torch.jit.script
 def mish(input):
     '''
@@ -277,6 +421,7 @@ class Mish(nn.Module):
         >>> input = torch.randn(2)
         >>> output = m(input)
     '''
+
     def __init__(self):
         '''
         Init method.
@@ -288,6 +433,7 @@ class Mish(nn.Module):
         Forward pass of the function.
         '''
         return mish(input)
+
 
 def convert_relu_to_Mish(model):
     for child_name, child in model.named_children():

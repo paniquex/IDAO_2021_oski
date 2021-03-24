@@ -33,7 +33,11 @@ class Wrapper(nn.Module):
         # self.max_pool = AdaptiveMaxPool2d((1, 1))
         self.dropout = Dropout(0.3)
         self.softmax = nn.Softmax(dim=1)
-        self.fc = Linear(ENCODER_PARAMS[model_name]['features'], classes_num)
+        if task_type == "joint":
+            self.fc_clf = Linear(ENCODER_PARAMS[model_name]['features'], classes_num)
+            self.fc_reg = Linear(ENCODER_PARAMS[model_name]['features'], 1)
+        else:
+            self.fc = Linear(ENCODER_PARAMS[model_name]['features'], classes_num)
         self.test = test
         if criterion_aam is not None:
             self.criterion_aam = criterion_aam(in_features=2048 * 8, out_features=classes_num)
@@ -76,11 +80,16 @@ class Wrapper(nn.Module):
             else:
                 output_dict = {}
             x = self.dropout(x)
-            x = self.fc(x)
-            if self.task_type == "classification":
-                x = self.softmax(x)
-            elif self.task_type == "regression":
-                x = x.view(-1)
+            if self.task_type == "joint":
+                x_clf = self.softmax(self.fc_clf(x))
+                x_reg = self.fc_reg(x).view(-1)
+                x = {"clf": x_clf, "reg": x_reg}
+            else:
+                x = self.fc(x)
+                if self.task_type == "classification":
+                    x = self.softmax(x)
+                elif self.task_type == "regression":
+                    x = x.view(-1)
             output_dict.update({
                 'preds': x,
                 'label': labels

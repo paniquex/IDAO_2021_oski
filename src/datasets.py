@@ -15,9 +15,15 @@ class SimpleDataset(Dataset):
         self.transform = transform
         self.samples = self.df["file_path"].values
         if mode != "test":
-            self.labels = df[target_cols].values
-            if task_type == "classification":
-                self.labels = self.labels[:, None] == list(range(classes_num))
+            if task_type == "joint":
+                self.labels_clf = df[target_cols + "_classification"].values[:, None] == list(range(classes_num))
+                self.labels_reg = df[target_cols + "_regression"].values
+
+            else:
+                self.labels = df[target_cols].values
+                if task_type == "classification":
+                    self.labels = self.labels[:, None] == list(range(classes_num))
+        self.task_type = task_type
 
     def __len__(self):
         return len(self.df)
@@ -33,7 +39,12 @@ class SimpleDataset(Dataset):
         if self.mode == 'test':
             return {"sample": self.samples[index], "img": img}
         else:
-            label = torch.tensor(self.labels[index]).float()
+            if self.task_type == "joint":
+                label = {"clf": torch.tensor(self.labels_clf[index]).float(),
+                         "reg": torch.tensor(self.labels_reg[index]).float()}
+            else:
+                label = torch.tensor(self.labels[index]).float()
+
             return {"sample": self.samples[index], "img": img, "label": label}
 
 
