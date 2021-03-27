@@ -10,6 +10,8 @@ from collections import defaultdict
 import torch
 import os
 from shutil import copyfile
+from datasets import SimpleDataset
+from torch.utils.data import DataLoader
 
 
 def training(EPOCHS, model, train_dataloader,
@@ -442,15 +444,32 @@ def convert_relu_to_Mish(model):
         else:
             convert_relu_to_Mish(child)
 
- def pseudolabeling(models, Train, Test, reg_postprocessing, threshold):
+def pseudolabeling(models, Train, Test, config, DEVICE):
+    threshold = config["pseudo"]["threshold"]
     clf = torch.zeros((len(Test), 2))
     reg = torch.zeros(len(Test))
 
+    task_type = config["general"]["task_type"]
+    batch_size = config["testing"]["dataloader"]["batch_size"]
     for model in models:
         model.eval()
-        outputs = model.predict(Test)["outputs"]
-        clf += outputs["clf"]
-        reg += outputs["reg"]
+
+        test_dataset = SimpleDataset(df=Test, mode="test", classes_num=config["general"]["classes_num"],
+                                        task_type=config["general"]["task_type"])
+
+        test_dataloader = DataLoader(test_dataset,
+                                        **config["testing"]["dataloader"])
+
+        for i, batch in enumerate(test_dataloader):
+            output_dict = model(batch["img"].to(DEVICE))
+            preds = output_dict["preds"]
+            assert task_type == "joint"
+            preds["clf"] = preds["clf"].cpu().numpy()
+            preds["reg"] = preds["reg"].cpu().numpy()
+
+            clf[i * batch_size : (i+1) * batch_size, :] += preds["clf"]
+            reg[i * batch_size : (i+1) * batch_size] += preds["reg"]
+
         model.train()
 
     clf /= len(models)
@@ -461,7 +480,7 @@ def convert_relu_to_Mish(model):
     pseudo_clf = torch.max(clf[np.where(max_prob > threshold)[0]], axis=1)[1]
     pseudo_reg = reg[np.where(max_prob > threshold)[0]]
 
-    if reg_postprocessing:
+    if config["pseudo"]["reg_postprocessing"]:
         energy_values = Train["1"].unique()
         mapper = {i: energy_values[i] for i in range(len(energy_values))}
         pseudo_reg = np.vectorize(mapper.get)(np.argmin(abs(pseudo_reg - energy_values), axis=1))
