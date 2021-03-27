@@ -14,7 +14,9 @@ preprocessing:
   img_size: [384, 384]
 
 pseudo:
-  n_epochs: 5
+  iter: 5
+  n_epochs: 10
+  n_epochs_flat: 3
   lr_coef : 0.5
   reg_postprocessing: False
   threshold: 0.95
