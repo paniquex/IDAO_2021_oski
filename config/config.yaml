@@ -13,14 +13,22 @@ general:
 preprocessing:
   img_size: [384, 384]
 
+pseudo:
+  n_epochs: 5
+  lr_coef : 0.5
+  reg_postprocessing: False
+  threshold: 0.95
+
 
 training:
-  loss: "L1" # "L1" - regression, "AAM" "BCE", "FOCAL" - classification
+  loss:
+    clf: "BCE"
+    reg: "L1" # "L1" - regression, "AAM" "BCE", "FOCAL" - classification
   activation_func: ReLU # ReLU, Mish
-  n_epochs: 25
-  n_epochs_flat: 10
-  early_stopping_criterion: 10
-  n_folds: 5
+  n_epochs: 15
+  n_epochs_flat: 5
+  early_stopping_criterion: 5
+  n_folds: 3
   logging_freq: 1
   lr: !!float 1e-4
   finetune: False
