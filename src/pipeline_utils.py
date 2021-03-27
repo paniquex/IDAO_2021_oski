@@ -1,5 +1,4 @@
 import sys
-
 from paths import PATH_APPEND
 sys.path.append(PATH_APPEND)
 
@@ -296,12 +295,11 @@ def evaluate(model, dataloader, DEVICE,
                         samples2trues[sample] = [true]
                     else:
                         samples2trues[sample].append(true)
-
+                  
                     if sample not in samples2preds:
                         samples2preds[sample] = [pred]
                     else:
                         samples2preds[sample].append(pred)
-
         if task_type == "joint":
             trues = {"clf": [], "reg": []}
             preds = {"clf": [], "reg": []}
