@@ -1,5 +1,6 @@
 import sys
-sys.path.append("/media/paniquex/samsung_2tb/IDAO_2021_oski/src")
+from paths import PATH_APPEND
+sys.path.append(PATH_APPEND)
 
 import torch
 import numpy as np
