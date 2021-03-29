@@ -11,12 +11,14 @@ from collections import defaultdict
 import torch
 import os
 from shutil import copyfile
+from datasets import SimpleDataset
+from torch.utils.data import DataLoader
 
 
 def training(EPOCHS, model, train_dataloader,
              val_dataloaders_dct, DEVICE, criterion,
              optimizer, config, scheduler=None,
-             fold=0, task_type="classification", CONFIG_PATH=""):
+             fold=0, pseudo_iter=0, task_type="classification"):
     if fold == 0:
         copyfile(CONFIG_PATH,
                  f"{config['general']['out_path']}config.yaml")
@@ -210,7 +212,7 @@ def training(EPOCHS, model, train_dataloader,
                     model_names[val_dataloader_name].append(
                         f"{config['general']['out_path']}{config['general']['model_name']}_score={best_scores[val_dataloader_name]:.5f}")
                 pd.DataFrame(val_df[val_dataloader_name]).to_csv(
-                    f"{config['general']['out_path']}{config['general']['model_name']}_{val_dataloader_name}_{fold}.csv",
+                    f"{config['general']['out_path']}{config['general']['model_name']}_{val_dataloader_name}_{pseudo_iter}_{fold}.csv",
                     index=None)
 
         if early_stopping_counter > early_stopping_criterion:
@@ -224,7 +226,7 @@ def training(EPOCHS, model, train_dataloader,
         for model_name in model_names[val_dataloader_name][:-1]:
             if model_name != best_model_name:
                 os.remove(model_name)
-    return samples2preds_all, samples2trues_all
+    return samples2preds_all, samples2trues_all, model
 
 
 def evaluate(model, dataloader, DEVICE,
@@ -441,4 +443,57 @@ def convert_relu_to_Mish(model):
             setattr(model, child_name, Mish())
         else:
             convert_relu_to_Mish(child)
+                  
+                  
+def pseudolabeling(models, Train, Test, config, DEVICE, transforms_val):
+    threshold = config["pseudo"]["threshold"]
+    clf = torch.zeros((len(Test), 2))
+    reg = torch.zeros(len(Test))
 
+    task_type = config["general"]["task_type"]
+    batch_size = config["testing"]["dataloader"]["batch_size"]
+    for model in models:
+        model.eval()
+
+        test_dataset = SimpleDataset(df=Test, mode="test", classes_num=config["general"]["classes_num"],
+                                        task_type=config["general"]["task_type"], transform=transforms_val)
+
+        test_dataloader = DataLoader(test_dataset,
+                                        **config["testing"]["dataloader"])
+
+        for i, batch in enumerate(test_dataloader):
+            output_dict = model(batch["img"].to(DEVICE))
+            preds = output_dict["preds"]
+            assert task_type == "joint"
+            preds["clf"] = preds["clf"].cpu().numpy()
+            preds["reg"] = preds["reg"].cpu().numpy()
+
+            clf[i * batch_size : (i+1) * batch_size, :] += preds["clf"]
+            reg[i * batch_size : (i+1) * batch_size] += preds["reg"]
+
+        model.train()
+
+    clf /= len(models)
+    reg /= len(models)
+    max_prob = clf.max(axis=1)[0]
+
+    pseudo_X = Test.iloc[np.where(max_prob > threshold)[0]].copy()
+    pseudo_clf = torch.max(clf[np.where(max_prob > threshold)[0]], axis=1)[1]
+    pseudo_reg = reg[np.where(max_prob > threshold)[0]]
+
+    if config["pseudo"]["reg_postprocessing"]:
+        energy_values = Train["1"].unique()
+        mapper = {i: energy_values[i] for i in range(len(energy_values))}
+        pseudo_reg = np.vectorize(mapper.get)(np.argmin(abs(pseudo_reg - energy_values), axis=1))
+
+    pseudo_X["target_regression"] = pseudo_reg
+    pseudo_X["1"] = pseudo_reg
+    pseudo_X["target_classification"] = pseudo_clf
+    pseudo_X["0"] =  pseudo_X.apply(lambda x: "ER" if x["target_classification"] == 0 else "NR", axis=1)
+    pseudo_X["target"] = pseudo_X.apply(lambda x: str(int(x["target_regression"])) + "_" + str(x["target_classification"]),axis=1)
+    pseudo_X["kfold"] = config["training"]["n_folds"]
+    new_Test = Test.iloc[np.where(max_prob <= threshold)[0]]
+
+    new_Train = pd.concat([Train, pseudo_X],axis=0)
+
+    return new_Train, new_Test
