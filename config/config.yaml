@@ -10,7 +10,7 @@ general:
   early_stopping_by: "comp_metric" # f1, roc_auc, mae, comp_metric
 
 preprocessing:
-  img_size: [384, 384]
+  img_size: [224, 224]
 
 pseudo:
   iter: 5
