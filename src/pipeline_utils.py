@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 def training(EPOCHS, model, train_dataloader,
              val_dataloaders_dct, DEVICE, criterion,
              optimizer, config, scheduler=None,
-             fold=0, pseudo_iter=0, task_type="classification"):
+             fold=0, pseudo_iter=0, task_type="classification", CONFIG_PATH=None):
     if fold == 0:
         copyfile(CONFIG_PATH,
                  f"{config['general']['out_path']}config.yaml")

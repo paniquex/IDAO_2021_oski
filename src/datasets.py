@@ -38,7 +38,7 @@ class SimpleDataset(Dataset):
             res = self.transform(image=img)
             img = res['image']
         if self.mode == 'test':
-            return {"sample": self.samples[index], "img": img}
+            return {"sample": self.samples[index], "img": img[0].unsqueeze(0)}
         else:
             if self.task_type == "joint":
                 label = {"clf": torch.tensor(self.labels_clf[index]).float(),
@@ -46,7 +46,7 @@ class SimpleDataset(Dataset):
             else:
                 label = torch.tensor(self.labels[index]).float()
 
-            return {"sample": self.samples[index], "img": img, "label": label}
+            return {"sample": self.samples[index], "img": img[0].unsqueeze(0), "label": label}
 
 
 class EmbGenerationDataset(Dataset):

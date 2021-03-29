@@ -126,88 +126,88 @@ class MixUp(nn.Module):
 ENCODER_PARAMS = {
     "nf_resnet50": {
             "features": 2048,
-            "init_op": partial(nf_resnet50, pretrained=True, in_chans=3)
+            "init_op": partial(nf_resnet50, pretrained=True, in_chans=1)
         },
     "nf_regnet_b0": {
                 "features": 960,
-                "init_op": partial(nf_regnet_b0, pretrained=True, in_chans=3)
+                "init_op": partial(nf_regnet_b0, pretrained=True, in_chans=1)
             },
     "nf_ecaresnet50": {
                     "features": 2048,
-                    "init_op": partial(nf_ecaresnet50, pretrained=True, in_chans=3)
+                    "init_op": partial(nf_ecaresnet50, pretrained=True, in_chans=1)
                 },
     "resnest14d": {
         "features": 2048,
-        "init_op": partial(timm.models.resnest14d, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.resnest14d, pretrained=True, in_chans=1)
     },
     "resnest26d": {
         "features": 2048,
-        "init_op": partial(timm.models.resnest26d, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.resnest26d, pretrained=True, in_chans=1)
     },
     "resnest50d": {
         "features": 2048,
-        "init_op": partial(timm.models.resnest50d, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.resnest50d, pretrained=True, in_chans=1)
     },
     "resnest50d_4s2x40d": {
         "features": 2048,
-        "init_op": partial(timm.models.resnest50d_4s2x40d, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.resnest50d_4s2x40d, pretrained=True, in_chans=1)
     },
     "resnest101e": {
         "features": 2048,
-        "init_op": partial(timm.models.resnest101e, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.resnest101e, pretrained=True, in_chans=1)
     },
 "resnest200e": {
         "features": 2048,
-        "init_op": partial(timm.models.resnest200e, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.resnest200e, pretrained=True, in_chans=1)
     },
 "resnest269e": {
         "features": 2048,
-        "init_op": partial(timm.models.resnest269e, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.resnest269e, pretrained=True, in_chans=1)
     },
 
     "densenet201": {
         "features": 1920,
-        "init_op": partial(timm.models.densenet201, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.densenet201, pretrained=True, in_chans=1)
     },
     "dpn92": {
         "features": 2688,
-        "init_op": partial(timm.models.dpn92, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.dpn92, pretrained=True, in_chans=1)
     },
     "dpn131": {
         "features": 2688,
-        "init_op": partial(timm.models.dpn131, pretrained=True, in_chans=3)
+        "init_op": partial(timm.models.dpn131, pretrained=True, in_chans=1)
     },
 
         "tf_efficientnet_b0_ns": {
             "features": 1280,
-            "init_op": partial(tf_efficientnet_b0_ns, pretrained=True, drop_path_rate=0.2, in_chans=3)
+            "init_op": partial(tf_efficientnet_b0_ns, pretrained=True, drop_path_rate=0.2, in_chans=1)
         },
 "tf_efficientnet_lite0": {
             "features": 1280,
-            "init_op": partial(tf_efficientnet_lite0, pretrained=True, drop_path_rate=0.2, in_chans=3)
+            "init_op": partial(tf_efficientnet_lite0, pretrained=True, drop_path_rate=0.2, in_chans=1)
         },
         "tf_efficientnet_b3_ns": {
             "features": 1536,
-            "init_op": partial(tf_efficientnet_b3_ns, pretrained=True, drop_path_rate=0.2, in_chans=3)
+            "init_op": partial(tf_efficientnet_b3_ns, pretrained=True, drop_path_rate=0.2, in_chans=1)
         },
         "tf_efficientnet_b2_ns": {
             "features": 1408,
-            "init_op": partial(tf_efficientnet_b2_ns, pretrained=True, drop_path_rate=0.2, in_chans=3)
+            "init_op": partial(tf_efficientnet_b2_ns, pretrained=True, drop_path_rate=0.2, in_chans=1)
         },
         "tf_efficientnet_b4_ns": {
             "features": 1792,
-            "init_op": partial(tf_efficientnet_b4_ns, pretrained=True, drop_path_rate=0.2, in_chans=3)
+            "init_op": partial(tf_efficientnet_b4_ns, pretrained=True, drop_path_rate=0.2, in_chans=1)
         },
         "tf_efficientnet_b5_ns": {
             "features": 2048,
-            "init_op": partial(tf_efficientnet_b5_ns, pretrained=True, drop_path_rate=0.2, in_chans=3)
+            "init_op": partial(tf_efficientnet_b5_ns, pretrained=True, drop_path_rate=0.2, in_chans=1)
         },
         "tf_efficientnet_b6_ns": {
             "features": 2304,
-            "init_op": partial(tf_efficientnet_b6_ns, pretrained=True, drop_path_rate=0.2, in_chans=3)
+            "init_op": partial(tf_efficientnet_b6_ns, pretrained=True, drop_path_rate=0.2, in_chans=1)
         },
         "tf_efficientnet_l2_ns": {
                     "features": 2304,
-                    "init_op": partial(tf_efficientnet_b6_ns, pretrained=True, drop_path_rate=0.2, in_chans=3)
+                    "init_op": partial(tf_efficientnet_b6_ns, pretrained=True, drop_path_rate=0.2, in_chans=1)
                 },
 }
