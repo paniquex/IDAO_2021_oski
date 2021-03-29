@@ -8,3 +8,35 @@ data/track_1/idao_dataset/train/ER/
 data/track_1/idao_dataset/train/NR/
 
 data/track_1.tar
+
+experiments/
+
+notebooks/sandbox/
+
+notebooks/EDA.ipynb
+
+notebooks/inference_pipeline_balanced.ipynb
+
+notebooks/mean-teachers-find-more-birds-Copy1.ipynb
+
+notebooks/mean-teachers-find-more-birds-Copy2.ipynb
+
+notebooks/mean-teachers-find-more-birds-Copy3.ipynb
+
+notebooks/mean-teachers-find-more-birds.ipynb
+
+notebooks/submission_max.csv
+
+notebooks/submission_mean.csv
+
+notebooks/test_predicts.ipynb
+
+notebooks/training_pipeline_balanced-Copy1.ipynb
+
+notebooks/training_pipeline_balanced.ipynb
+
+notebooks/training_pipeline_finetuning.ipynb
+
+notebooks/Convert Samplerate.ipynb
+
+notebooks/debug.ipynb
