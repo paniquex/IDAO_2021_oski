@@ -1,0 +1,133 @@
+general:
+  seed: 1
+  classes_num: 24 # 24 + silence
+  model_name: "resnest50d"
+  SED: False
+  SED_aggregation: "mean"
+  use_additional_loss_for_aam: True
+  device_ids: [0]
+  out_path: "./rfcx_kaggle_git/RFCX_kaggle/experiments/logs2_finet_feat=melspec_mr_SR=32_CMVN=F_mean_model=resnest50d_Pretrained=T_SED=F_aggr=mean_act_func=Mish_crit=FOCAL_Balanced=T_lens=F_length=3_n_classes=24_optim=ranger_wd_sched=cosine_lr=5e-4_SpecAug=F_MixUp=T_a=16_or_Gain=T_n_mels=128_hop_size=512/"
+  data_root: "/media/paniquex/samsung_2tb/rfcx_kaggle/rfcx-species-audio-detection"
+  use_silence_class: False
+  early_stopping_by: "lwlrap" # f1, lwlrap
+
+
+preprocessing:
+  sr: 32000
+  use_cmvn: False
+  features_type: "melspec" # mfcc, logmelfilter, logmelspec, melspec
+  spectrogram:
+    n_fft: 1024 #1024
+    win_length: 1024 #1024
+    hop_length: 512 # 512
+    window: "hann"
+    center: True
+    pad_mode: "reflect"
+    freeze_parameters: True
+  logmel:
+    n_fft: 1024
+    n_mels: 128
+    fmin: 70
+    fmax: 16000 # sr // 2 !
+    ref: 1.0
+    amin: !!float 1e-10
+    top_db: null
+  melspec:
+    n_mels: 128
+    fmin: 70
+    fmax: 16000 # sr // 2!
+    n_fft: 1024 #1024
+    win_length: 1024 #1024
+    hop_length: 512 # 512
+    window: "hann"
+    center: True
+    pad_mode: "reflect"
+  mfcc:
+    n_mels: 128
+    fmin: 70
+    fmax: 16000 # sr // 2!
+
+
+
+training:
+  loss: "FOCAL" #"AAM" "BCE" # LSEP, FOCAL
+  activation_func: Mish # ReLU
+  n_epochs: 30
+  early_stopping_criterion: 5
+  n_folds: 5
+  logging_freq: 1
+  lr: !!float 5e-4
+  finetune: True
+
+  augmentations: {"GaussianNoise": {p: 0.3},
+                  "GaussianSNR": {p: 0.3},
+                  "Gain": {p: 0.1},
+                  "MixUp": {prob: 0.3, alpha: 16, mixup_mode: "or"},}
+#                  "SpecAug": {time_drop_width: 8, time_stripes_num: 2,
+#                              freq_drop_width: 8, freq_stripes_num: 2}} #dict with aug name: params mapping
+  models_dir: "/media/paniquex/samsung_2tb/rfcx_kaggle_git/RFCX_kaggle/experiments/logs_features=melspec_mr_SR=32_CMVN=F_model=resnest50d_Pretrained=True_SED=F_aggr=max_act_func=Mish_criterion=LSEP_Balanced=T_length=6_n_classes=24_optim=ranger_sched=cosine_lr=1e-3_SpecAug=True_MixUp=True_alpha=16_Gain=T_n_mels=128"
+
+  # dataset config
+  dataset:
+    path: "/media/paniquex/samsung_2tb/rfcx_kaggle/rfcx-species-audio-detection/train_32000"
+    prefix: "train"
+    train: True
+    num_files: 10 # maybe we can remove this parameter from Dataset class?
+    length: 3 # sec
+    step: 1 # sec
+    min_intersect: 0.0 # sec
+    tp_csv: "train_folds.csv"
+    fp_csv: null
+    remove_unlabeled_parts: True
+    balanced: True
+  len_sampling: False
+
+  # dataloader config
+  dataloader:
+    batch_size: 24
+    shuffle: True
+    num_workers: 4
+    pin_memory: False
+    drop_last: True
+
+validation:
+  augmentations: {}
+
+  dataset:
+    path: "/media/paniquex/samsung_2tb/rfcx_kaggle/rfcx-species-audio-detection/train_32000"
+    prefix: "train"
+    train: False
+    num_files: 10 # maybe we can remove this parameter from Dataset class?
+    length: 3 # sec
+    step: 1 # sec
+    min_intersect: 0.0 # sec
+    tp_csv: "train_folds.csv"
+    fp_csv: null
+    remove_unlabeled_parts: True
+    balanced: True
+
+    # dataloader config
+  dataloader:
+    batch_size: 24
+    shuffle: False
+    num_workers: 4
+    pin_memory: False
+
+
+testing:
+  augmentations: {}
+  state_dict: "/media/paniquex/samsung_2tb/rfcx_kaggle_git/RFCX_kaggle/experiments/logs_model=resnest50d_Pretrained=True_act_func=Mish_criterion=BCE_length=10_step=2_intersect=0.5_new_dataset_num_classes=24_optim=ranger_sched=plateau_lr=1e-3_SpecAug=True_MixUp=True_alpha=1_n_mels=128_valid=NotLikeTest_folds=5_check/resnest50d_score=0.70475"
+ #"/media/paniquex/samsung_2tb/rfcx_kaggle/notebooks/training/nikita/submission_resnest50_cosine/logs_10/resnest50d_cosine_scheduler_score=0.8736775909814807" #
+  models_dir: "/media/paniquex/samsung_2tb/rfcx_kaggle_git/RFCX_kaggle/experiments/logs1_features=melspec_mr_SR=32_CMVN=F_mean_model=tf_effnet_b0_Pretrained=T_SED=T_aggr=mean_act_func=Mish_criterion=FOCAL_Balanced=T_length=6_n_classes=24_optim=ranger_sched=cosine_lr=1e-3_SpecAug=F_MixUp=True_alpha=16_Gain=T_n_mels=256_hop_length=256/"
+  dataset:
+    path: "/media/paniquex/samsung_2tb/rfcx_kaggle/rfcx-species-audio-detection/test_32000"
+    prefix: "test"
+    num_files: 4 # maybe we can remove this parameter from Dataset class?
+    length: 6 # sec
+    step: 1 # sec
+
+  dataloader:
+    batch_size: 64
+    shuffle: False
+    num_workers: 4
+    pin_memory: True
