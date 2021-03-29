@@ -211,7 +211,7 @@ def training(EPOCHS, model, train_dataloader,
                     model_names[val_dataloader_name].append(
                         f"{config['general']['out_path']}{config['general']['model_name']}_score={best_scores[val_dataloader_name]:.5f}")
                 pd.DataFrame(val_df[val_dataloader_name]).to_csv(
-                    f"{config['general']['out_path']}{config['general']['model_name']}_{val_dataloader_name}_{pseudo_iter + 1}_{fold}.csv",
+                    f"{config['general']['out_path']}{config['general']['model_name']}_{val_dataloader_name}_{pseudo_iter}_{fold}.csv",
                     index=None)
 
         if early_stopping_counter > early_stopping_criterion:
@@ -444,7 +444,7 @@ def convert_relu_to_Mish(model):
         else:
             convert_relu_to_Mish(child)
 
-def pseudolabeling(models, Train, Test, config, DEVICE):
+def pseudolabeling(models, Train, Test, config, DEVICE, transforms_val):
     threshold = config["pseudo"]["threshold"]
     clf = torch.zeros((len(Test), 2))
     reg = torch.zeros(len(Test))
@@ -455,7 +455,7 @@ def pseudolabeling(models, Train, Test, config, DEVICE):
         model.eval()
 
         test_dataset = SimpleDataset(df=Test, mode="test", classes_num=config["general"]["classes_num"],
-                                        task_type=config["general"]["task_type"])
+                                        task_type=config["general"]["task_type"], transform=transforms_val)
 
         test_dataloader = DataLoader(test_dataset,
                                         **config["testing"]["dataloader"])
