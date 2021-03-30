@@ -5,10 +5,9 @@ general:
   model_name: "resnest14d"
   use_additional_loss_for_aam: True
   device_ids: [0]
-  out_path: "./IDAO_2021_oski/experiments/resnest14d_1e-4_joint/"
+  out_path: "./IDAO_2021_oski/experiments/resnest14d_1e-4_joint_/"
   data_root: "/media/paniquex/samsung_2tb/IDAO_2021_oski/data/track_1/idao_dataset"
   early_stopping_by: "comp_metric" # f1, roc_auc, mae, comp_metric
-
 
 preprocessing:
   img_size: [384, 384]
