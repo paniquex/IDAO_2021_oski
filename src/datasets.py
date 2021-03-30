@@ -31,8 +31,11 @@ class SimpleDataset(Dataset):
 
     def __getitem__(self, index):
         row = self.df.loc[index]
-        img = cv2.imread(row.file_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        try:
+            img = cv2.imread(row.file_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        except:
+            print(row.file_path)
 
         if self.transform is not None:
             res = self.transform(image=img)

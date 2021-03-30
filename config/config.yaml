@@ -41,10 +41,10 @@ training:
 
   # dataloader config
   dataloader:
-    batch_size: 32
+    batch_size: 64
     shuffle: True
     num_workers: 8
-    pin_memory: False
+    pin_memory: True
     drop_last: True
 
 validation:
@@ -54,9 +54,9 @@ validation:
 
   # dataloader config
   dataloader:
-    batch_size: 24
+    batch_size: 64
     shuffle: False
-    num_workers: 4
+    num_workers: 8
     pin_memory: False
 
 
