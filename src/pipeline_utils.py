@@ -17,9 +17,9 @@ from torch.utils.data import DataLoader
 def training(EPOCHS, model, train_dataloader,
              val_dataloaders_dct, DEVICE, criterion,
              optimizer, config, scheduler=None,
-             fold=0, pseudo_iter=0, task_type="classification"):
+             fold=0, pseudo_iter=0, task_type="classification", CONFIG_PATH="/media/paniquex/samsung_2tb/IDAO_2021_oski/config/config.yaml"):
     if fold == 0:
-        copyfile("/media/paniquex/samsung_2tb/IDAO_2021_oski/config/config.yaml",
+        copyfile(CONFIG_PATH,
                  f"{config['general']['out_path']}config.yaml")
     tta_steps = 0
     best_scores = {}
