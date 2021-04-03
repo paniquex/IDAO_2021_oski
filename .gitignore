@@ -8,3 +8,5 @@ data/track_1/idao_dataset/train/ER/
 data/track_1/idao_dataset/train/NR/
 
 data/track_1.tar
+
+*.png

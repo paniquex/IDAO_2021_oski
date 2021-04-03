@@ -4,7 +4,7 @@ sys.path.append(PATH_APPEND)
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from tqdm import tqdm, tqdm_notebook
 from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, mean_absolute_error
 # from metrics import calculate_per_class_roc_auc
 from collections import defaultdict
@@ -19,7 +19,7 @@ def training(EPOCHS, model, train_dataloader,
              val_dataloaders_dct, DEVICE, criterion,
              optimizer, config, scheduler=None,
              fold=0, pseudo_iter=0, task_type="classification", CONFIG_PATH=None):
-    if fold == 0:
+    if fold == 0 and pseudo_iter == 0:
         copyfile(CONFIG_PATH,
                  f"{config['general']['out_path']}config.yaml")
     tta_steps = 0
@@ -375,7 +375,10 @@ def log_results(df, prefix, info_dict, trues, preds_dict, out_path):
 def evaluate_test(model, dataloader, DEVICE, config):
     t = tqdm(dataloader)
     model.eval()
-    samples2preds = {}
+    if config["general"]["task_type"] == "joint":
+        samples2preds = {"clf": {}, "reg": {}}
+    else:
+        samples2preds = {}
     for batch in t:
         img_ = batch["img"].to(DEVICE)
         output_dict = model(img_)
@@ -383,15 +386,30 @@ def evaluate_test(model, dataloader, DEVICE, config):
             preds = output_dict["preds"].cpu().numpy()
         elif config["general"]["task_type"] == "classification":
             preds = torch.argmax(output_dict["preds"], dim=1).cpu().numpy()
-        assert len(batch['sample']) == preds.shape[0]
-        for sample, pred in zip(batch['sample'], preds):
-            if len(pred.shape) == 2:
-                samples2preds[sample] = pred
-            else:
-                if sample not in samples2preds:
-                    samples2preds[sample] = [pred]
+        elif config["general"]["task_type"] == "joint":
+            preds = output_dict["preds"]
+            preds["clf"] = preds["clf"].cpu().numpy()
+            preds["reg"] = preds["reg"].cpu().numpy()
+        # assert len(batch['sample']) == preds.shape[0]
+        if config["general"]["task_type"] == "joint":
+            for key in ["clf", "reg"]:
+                for sample, pred in zip(batch['sample'], preds[key]):
+                    if len(pred.shape) == 2:
+                        samples2preds[key][sample] = pred
+                    else:
+                        if sample not in samples2preds[key]:
+                            samples2preds[key][sample] = [pred]
+                        else:
+                            samples2preds[key][sample].append(pred)
+        else:
+            for sample, pred in zip(batch['sample'], preds):
+                if len(pred.shape) == 2:
+                    samples2preds[sample] = pred
                 else:
-                    samples2preds[sample].append(pred)
+                    if sample not in samples2preds:
+                        samples2preds[sample] = [pred]
+                    else:
+                        samples2preds[sample].append(pred)
     return samples2preds
 
 
@@ -461,7 +479,7 @@ def pseudolabeling(models, Train, Test, config, DEVICE, transforms_val):
         test_dataloader = DataLoader(test_dataset,
                                         **config["testing"]["dataloader"])
 
-        for i, batch in enumerate(test_dataloader):
+        for i, batch in enumerate(tqdm_notebook(test_dataloader)):
             output_dict = model(batch["img"].to(DEVICE))
             preds = output_dict["preds"]
             assert task_type == "joint"
