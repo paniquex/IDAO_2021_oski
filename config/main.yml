@@ -1,0 +1,23 @@
+paths:
+    data_path: '../data'
+    train_dir: 'train'
+    train_file: 'train.csv'
+    val_file: 'val_private.csv'
+    public_test_dir: 'public_test'
+    private_test_dir: 'private_test'
+    test_file: 'test.csv'
+    widen_valid_dir: 'valid'
+    widen_file: 'widen_val_private.csv'
+    
+
+data_generation:
+    aug_rounds: 1
+    cutout_params: 
+        max_holes: 40
+        min_holes: 20
+        max_height: 25
+        max_width: 5
+        min_height: 25
+        min_width: 5
+        p: 1.0
+    
