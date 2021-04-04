@@ -1,0 +1,10 @@
+torch>=1.7.0
+numpy
+pandas
+catboost
+pillow
+albumentations==0.5.2
+opencv
+transformers
+timm
+tqdm
