@@ -1,0 +1,69 @@
+general:
+  task_type: "joint" # classification, regression, joint
+  classes_num: 6 # 24 + silence
+  model_name: "resnest50d_4s2x40d"
+  use_additional_loss_for_aam: True
+  out_path: "experiments/resnest50d_4s2x40d_1e-3_joint_BCE_L1_with_private_augmented_old_center_crop=150/"
+  early_stopping_by: "comp_metric" # f1, roc_auc, mae, comp_metric
+
+preprocessing:
+  img_size: [224, 224]
+  center_crop_size: [150, 150]
+
+pseudo:
+  iter: 3
+  n_epochs: 5
+  n_epochs_flat: 2
+  lr_coef : 0.1
+  reg_postprocessing: False
+  threshold: 0.99
+
+
+training:
+  loss:
+    clf: "BCE"
+    reg: "L1" # "L1" - regression, "AAM" "BCE", "FOCAL" - classification
+  activation_func: ReLU # ReLU, Mish
+  n_epochs: 10
+  n_epochs_flat: 5
+  early_stopping_criterion: 5
+  n_folds: 3
+  logging_freq: 1
+  lr: !!float 1e-3
+  models_dir: "" # Directory with pretrained models
+  # augmentations: {} #dict with aug name: params mapping #TODO
+
+  # dataset config
+  #dataset: TODO
+
+  # dataloader config
+  dataloader:
+    batch_size: 32
+    shuffle: True
+    num_workers: 8
+    pin_memory: True
+    drop_last: True
+
+validation:
+#  augmentations: {} TODO
+
+#  dataset:  TODO
+
+  # dataloader config
+  dataloader:
+    batch_size: 32
+    shuffle: False
+    num_workers: 8
+    pin_memory: False
+
+
+testing:
+#  augmentations: {} TODO
+  models_dir: "/media/paniquex/samsung_2tb/IDAO_2021_oski/experiments/check_experiment/" # directory with pretrained models
+#  dataset: TODO
+
+  dataloader:
+    batch_size: 8
+    shuffle: False
+    num_workers: 4
+    pin_memory: True

@@ -18,10 +18,10 @@ from torch.utils.data import DataLoader
 def training(EPOCHS, model, train_dataloader,
              val_dataloaders_dct, DEVICE, criterion,
              optimizer, config, scheduler=None,
-             fold=0, pseudo_iter=0, task_type="classification", CONFIG_PATH=None):
+             fold=0, pseudo_iter=0, task_type="classification", CONFIG_PATH=None, prefix="../"):
     if fold == 0 and pseudo_iter == 0:
         copyfile(CONFIG_PATH,
-                 f"{config['general']['out_path']}config.yaml")
+                 os.path.join(prefix, config['general']['out_path'], "config.yaml"))
     tta_steps = 0
     best_scores = {}
     model_names = {}
@@ -155,8 +155,9 @@ def training(EPOCHS, model, train_dataloader,
         info_dict.update(scores_dict)
         log_results(train_df, "train", info_dict=info_dict, trues=trues,
                     preds_dict={"preds": preds},
-                    out_path=config["general"]["out_path"])
-        pd.DataFrame(train_df).to_csv(f"{config['general']['out_path']}{config['general']['model_name']}_train.csv",
+                    out_path=prefix + config["general"]["out_path"])
+        pd.DataFrame(train_df).to_csv(os.path.join(prefix, config['general']['out_path'],
+                                 f"{config['general']['model_name']}_train.csv"),
                                       index=None)
         flag_early_stopping = False
         if epoch % config["training"]["logging_freq"] == 0:
@@ -180,7 +181,7 @@ def training(EPOCHS, model, train_dataloader,
                 info_dict = {"epoch": epoch}
                 info_dict.update(scores_dict)
                 log_results(val_df[val_dataloader_name], "val", info_dict=info_dict,
-                            out_path=config["general"]["out_path"],
+                            out_path=prefix + config["general"]["out_path"],
                             trues=trues, preds_dict=preds_dict)
                 if not flag_early_stopping:
                     early_stopping_counter += 1
@@ -208,11 +209,14 @@ def training(EPOCHS, model, train_dataloader,
                     best_scores[val_dataloader_name] = max(best_max[val_dataloader_name],
                                                            best_mean[val_dataloader_name])
                     torch.save(all_params,
-                               f"{config['general']['out_path']}{config['general']['model_name']}_score={best_scores[val_dataloader_name]:.5f}")
+                               os.path.join(prefix, config['general']['out_path'],
+                                            f"{config['general']['model_name']}_score={best_scores[val_dataloader_name]:.5f}"))
                     model_names[val_dataloader_name].append(
-                        f"{config['general']['out_path']}{config['general']['model_name']}_score={best_scores[val_dataloader_name]:.5f}")
+                        os.path.join(prefix, config['general']['out_path'],
+                                     f"{config['general']['model_name']}_score={best_scores[val_dataloader_name]:.5f}"))
                 pd.DataFrame(val_df[val_dataloader_name]).to_csv(
-                    f"{config['general']['out_path']}{config['general']['model_name']}_{val_dataloader_name}_{pseudo_iter}_{fold}.csv",
+                    os.path.join(prefix, config['general']['out_path'],
+                                 f"{config['general']['model_name']}_{pseudo_iter}_{fold}.csv"),
                     index=None)
 
         if early_stopping_counter > early_stopping_criterion:
@@ -222,7 +226,7 @@ def training(EPOCHS, model, train_dataloader,
         print(model_names[val_dataloader_name])
         print(best_model_name)
         os.rename(best_model_name,
-                  f"{config['general']['out_path']}best_model_fold{fold}_score={best_scores[val_dataloader_name]:.5f}.pth")
+                  os.path.join(prefix, config['general']['out_path'], f"best_model_fold{fold}_score={best_scores[val_dataloader_name]:.5f}.pth"))
         for model_name in model_names[val_dataloader_name][:-1]:
             if model_name != best_model_name:
                 os.remove(model_name)
@@ -297,7 +301,7 @@ def evaluate(model, dataloader, DEVICE,
                         samples2trues[sample] = [true]
                     else:
                         samples2trues[sample].append(true)
-                  
+
                     if sample not in samples2preds:
                         samples2preds[sample] = [pred]
                     else:
@@ -365,10 +369,10 @@ def log_results(df, prefix, info_dict, trues, preds_dict, out_path):
     for info in info_dict:
         df[f"{prefix}_{info}"].append(info_dict[info])
 
-    np.save(f"{out_path}{prefix}_true_{info_dict['epoch']}.npy",
+    np.save(os.path.join(out_path, f"{prefix}_true_{info_dict['epoch']}.npy"),
             trues)
     for pred_name in preds_dict:
-        np.save(f"{out_path}{prefix}_pred_{pred_name}_{info_dict['epoch']}.npy",
+        np.save(os.path.join(out_path, f"{prefix}_pred_{pred_name}_{info_dict['epoch']}.npy"),
                 preds_dict[pred_name])
 
 
@@ -461,8 +465,8 @@ def convert_relu_to_Mish(model):
             setattr(model, child_name, Mish())
         else:
             convert_relu_to_Mish(child)
-                  
-                  
+
+
 def pseudolabeling(models, Train, Test, config, DEVICE, transforms_val):
     threshold = config["pseudo"]["threshold"]
     clf = torch.zeros((len(Test), 2))

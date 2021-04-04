@@ -8,11 +8,12 @@ paths:
     test_file: 'test.csv'
     widen_valid_dir: 'valid'
     widen_file: 'widen_val_private.csv'
-    
+    predictions_path: 'predictions'
+
 
 data_generation:
-    aug_rounds: 2000 # now set to 50.
-    cutout_params: 
+    aug_rounds: 1000
+    cutout_params:
         max_holes: 40
         min_holes: 20
         max_height: 25
@@ -20,4 +21,6 @@ data_generation:
         min_height: 25
         min_width: 5
         p: 1.0
-    
+
+seed: 1
+device_ids: [0]
