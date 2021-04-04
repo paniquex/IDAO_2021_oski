@@ -10,6 +10,8 @@ import albumentations
 from albumentations import CoarseDropout
 import cv2
 
+from tqdm import tqdm
+
 
 def parse_dataset(data_path='../data/',
                   train_file='train.csv',
@@ -73,7 +75,7 @@ def widen_valid_dataset(data_path='../data/',
         
     val_path = os.path.join(data_path, val_file)
     val_private = pd.read_csv(val_path, index_col=0)
-    os.makedirs(os.path.join(data_path, save_dir))
+    os.makedirs(os.path.join(data_path, save_dir), exist_ok=True)
     
     aug = albumentations.Compose([
         CoarseDropout(**cutout_params)])
@@ -83,13 +85,12 @@ def widen_valid_dataset(data_path='../data/',
         img = cv2.imread(data[1].file_path)
         name = data[1].file_path.split('/')[-1]
         new_private.append(data[1])
-        for i in range(aug_rounds):
+        for i in tqdm(range(aug_rounds), desc=name[:20], ncols=50):
             aug_img = aug(image=img)
             aug_data = data[1].copy()
             aug_data['file_path'] = os.path.join(data_path, save_dir, f'aug_{i}_{name}')
             new_private.append(aug_data)
             cv2.imwrite(aug_data['file_path'], aug_img['image'])
-            print(aug_data['file_path'])
     new_private = pd.DataFrame(new_private)
     save_path = os.path.join(data_path, widen_file)
     new_private.reset_index(drop=True).to_csv(save_path)

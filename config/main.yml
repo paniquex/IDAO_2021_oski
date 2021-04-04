@@ -11,7 +11,7 @@ paths:
     
 
 data_generation:
-    aug_rounds: 1
+    aug_rounds: 2000 # now set to 50.
     cutout_params: 
         max_holes: 40
         min_holes: 20
