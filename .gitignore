@@ -1,12 +1,4 @@
 
-data/track_1/idao_dataset/private_test/
-
-data/track_1/idao_dataset/public_test/
-
-data/track_1/idao_dataset/train/ER/
-
-data/track_1/idao_dataset/train/NR/
-
 data/track_1.tar
 
 *.png
