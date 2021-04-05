@@ -54,8 +54,8 @@ def parse_dataset(data_path=os.path.join("..", "data"),
                                 'type': 'private'})
     test_csv = test_csv.append(private_csv).reset_index()
 
-    test_csv.loc[test_csv.type == 'public', 'file_path'] = data_path + public_test_dir + "/" + test_csv['file_path']
-    test_csv.loc[test_csv.type == 'private', 'file_path'] = data_path + private_test_dir + "/" + test_csv['file_path']
+    test_csv.loc[test_csv.type == 'public', 'file_path'] = data_path + "/" + public_test_dir + "/" + test_csv['file_path']
+    test_csv.loc[test_csv.type == 'private', 'file_path'] = data_path + "/" + private_test_dir + "/" + test_csv['file_path']
     test_csv.to_csv(os.path.join(data_path, test_file))
 
 def widen_valid_dataset(data_path=os.path.join("..", "data"),
