@@ -68,6 +68,6 @@ ensembled_csv.loc[mask_private_1, "regression_predictions"] = np.vectorize(mappe
                                                 axis=1))
 
 ensembled_csv.drop(columns=["type"]).to_csv(os.path.join(PREFIX, config["paths"]["predictions_path"],
-                                                         "ensemble_post_smart.csv"), index=False)
+                                                         "final_predictions.csv"), index=False)
 
 ensembled_csv
